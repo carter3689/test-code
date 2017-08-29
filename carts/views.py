@@ -37,13 +37,13 @@ if settings.DEBUG:
 
 
 class CartView(SingleObjectMixin, View):
-    model = CartItem
+    model = Cart
     template_name = "carts/view.html"
 
     def get_object(self, *args, **kwargs):
         self.request.session.set_expiry(0)
         cart_id = self.request.session.get("cart_id")
-        if cart_id is None:
+        if cart_id == None:
             cart = Cart()
             cart.save()
             cart_id = cart.id
@@ -60,6 +60,7 @@ class CartView(SingleObjectMixin, View):
         item_id = request.GET.get("item")
         delete_item = request.GET.get("delete", False)
         item_added = False
+        created_item = False
         if item_id:
             item_instance = get_object_or_404(Variation, id=item_id)
             qty = request.GET.get("qty",1)
@@ -90,14 +91,26 @@ class CartView(SingleObjectMixin, View):
                 total = cart_item.line_item_total
             except:
                 total = None
+            try:
+                cart_total = cart_item.cart.total
+            except:
+                cart_total = None
+            try:
+                tax_total = cart_item.cart.tax_total
+            except:
+                tax_total = None
 
             try:
                 subtotal = cart_item.cart_subtotal
             except:
                 subtotal = None
+            try:
+                total_items = cart_item.cart.items.count()
+            except:
+                total_items = 0
             data = {
                 "deleted": delete_item,
-                "item_added": item_added,
+                "item_added": created_item,
                 "line_total": total,
                 "subtotal": subtotal,
                 "cart_total": cart_total,
@@ -121,12 +134,9 @@ class CheckoutView(CartOrderMixin, FormMixin, DetailView):
     form_class = GuestCheckoutForm
 
 
-    def get_success_url(self):
-        return reverse("checkout")
-
     def get_object(self, *args, **kwargs):
         cart = self.get_cart()
-        if cart is None:
+        if cart == None:
             return None
         return cart
 
@@ -134,9 +144,10 @@ class CheckoutView(CartOrderMixin, FormMixin, DetailView):
         context = super(CheckoutView, self).get_context_data( *args, **kwargs)
         user_can_continue = False
         user_check_id = self.request.session.get("user_checkout_id")
-        print("user_check_id: ", user_check_id)
-        print("self.request.session.get('user_checkout_id'): ",
-            self.request.session.get("user_checkout_id"))
+        print("THis is the session ---", self.request.session.session_key)
+        # print("user_check_id: ", user_check_id)
+        # # print("self.request.session.get('user_checkout_id'): ",
+        # #     self.request.session.get("user_checkout_id"))
         if not self.request.user.is_authenticated() or user_check_id is None:
             context["login_form"] = AuthenticationForm()
             context["next_url"] = self.request.build_absolute_uri()
@@ -160,13 +171,14 @@ class CheckoutView(CartOrderMixin, FormMixin, DetailView):
         else:
             pass
 
-        if user_check_id is not None:
+        if user_check_id != None:
             user_can_continue = True
             #GUEST USER - Making sure an authenticated token and a guest user
             #token don't come at the same time
             if not self.request.user.is_authenticated():
                 user_checkout_2 = UserCheckout.objects.get(id=user_check_id)
                 context["client_token"] = user_checkout_2.get_client_token()
+                pdb.set_trace()
         context["order"] = self.get_order()
         context["form"] = self.get_form()
         context["user_can_continue"] = user_can_continue
@@ -184,6 +196,9 @@ class CheckoutView(CartOrderMixin, FormMixin, DetailView):
             return self.form_valid(form)
         else:
             return self.form_invalid(form)
+
+    def get_success_url(self):
+        return reverse("checkout")
 
     def get(self, request, *args, **kwargs):
         print(request.GET)

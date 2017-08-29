@@ -24,7 +24,7 @@ class OrderDetail(DetailView):
             user_checkout = None
         if user_checkout:
             obj = self.get_object()
-            if obj.user is user_checkout and user_checkout is not None:
+            if obj.user == user_checkout and user_checkout is not None:
                 return super(OrderDetail, self).dispatch(request, *args, **kwargs)
         else:
             raise Http404
@@ -43,7 +43,7 @@ class UserAddressCreateView(CreateView):
     success_url = "/checkout/address/"
 
     def get_checkout_user(self):
-        user_check_id = self.request.session.get("user_check_id")
+        user_check_id = self.request.session.get("user_checkout_id")
         user_checkout = UserCheckout.objects.get(id = user_check_id)
         return user_checkout
 
